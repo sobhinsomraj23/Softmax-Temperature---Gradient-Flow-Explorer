@@ -1,83 +1,69 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
+from core.softmax import softmax_with_temperature
+from core.gradients import cross_entropy_gradient
 
 
-def softmax(logits):
+def compute_gradient_magnitude(logits, target, temperature):
     """
-    Stable softmax (reused for gradient computation)
+    Compute L2 norm of gradient for given temperature.
     """
-    shifted = logits - np.max(logits)
-    exp_vals = np.exp(shifted)
-    return exp_vals / np.sum(exp_vals)
+    probs = softmax_with_temperature(logits, temperature)
+    grad = cross_entropy_gradient(probs, target)
+    return np.linalg.norm(grad)
 
 
-def softmax_jacobian(probs):
-    """
-    Compute the Jacobian matrix of softmax.
+def run_temperature_experiment():
+    logits = np.array([8.0, 3.0, -1.0])
+    target = 0  # cat
 
-    Args:
-        probs (np.ndarray): Softmax probabilities (n,)
+    temperatures = np.linspace(0.1, 10, 100)
 
-    Returns:
-        np.ndarray: Jacobian matrix (n x n)
-    """
-    n = probs.shape[0]
-    jacobian = np.zeros((n, n))
+    prob_history = []
+    grad_magnitudes = []
 
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                jacobian[i][j] = probs[i] * (1 - probs[i])
-            else:
-                jacobian[i][j] = -probs[i] * probs[j]
+    for T in temperatures:
+        probs = softmax_with_temperature(logits, T)
+        grad_mag = compute_gradient_magnitude(logits, target, T)
 
-    return jacobian
+        prob_history.append(probs)
+        grad_magnitudes.append(grad_mag)
 
+    prob_history = np.array(prob_history)
 
-def cross_entropy_loss(probs, target_index):
-    """
-    Compute cross-entropy loss.
-
-    Args:
-        probs (np.ndarray): Softmax probabilities
-        target_index (int): Correct class index
-
-    Returns:
-        float: Loss value
-    """
-    return -np.log(probs[target_index])
+    plot_probabilities(temperatures, prob_history)
+    plot_gradient_magnitude(temperatures, grad_magnitudes)
 
 
-def cross_entropy_gradient(probs, target_index):
-    """
-    Gradient of cross-entropy loss w.r.t logits.
+def plot_probabilities(temperatures, prob_history):
+    plt.figure()
 
-    Key result: grad = probs - one_hot(target)
+    plt.plot(temperatures, prob_history[:, 0], label="cat")
+    plt.plot(temperatures, prob_history[:, 1], label="dog")
+    plt.plot(temperatures, prob_history[:, 2], label="lion")
 
-    Args:
-        probs (np.ndarray): Softmax probabilities
-        target_index (int): Correct class index
+    plt.xlabel("Temperature")
+    plt.ylabel("Probability")
+    plt.title("Softmax Probabilities vs Temperature")
+    plt.legend()
+    plt.grid()
 
-    Returns:
-        np.ndarray: Gradient vector
-    """
-    grad = probs.copy()
-    grad[target_index] -= 1
-    return grad
+    plt.show()
+
+
+def plot_gradient_magnitude(temperatures, grad_magnitudes):
+    plt.figure()
+
+    plt.plot(temperatures, grad_magnitudes)
+
+    plt.xlabel("Temperature")
+    plt.ylabel("Gradient Magnitude (L2 Norm)")
+    plt.title("Gradient Magnitude vs Temperature")
+    plt.grid()
+
+    plt.show()
 
 
 if __name__ == "__main__":
-    logits = np.array([2.0, 1.0, 0.1])
-    target = 0  # correct class
-
-    probs = softmax(logits)
-
-    print("Probabilities:", probs)
-
-    print("\nSoftmax Jacobian:")
-    print(softmax_jacobian(probs))
-
-    print("\nCross-Entropy Loss:")
-    print(cross_entropy_loss(probs, target))
-
-    print("\nGradient (Softmax + Cross-Entropy):")
-    print(cross_entropy_gradient(probs, target))
+    run_temperature_experiment()
