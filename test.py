@@ -1,62 +1,83 @@
 import numpy as np
 
 
-def log_sum_exp(logits):
+def softmax(logits):
     """
-    Compute log(sum(exp(logits))) in a numerically stable way.
+    Stable softmax (reused for gradient computation)
+    """
+    shifted = logits - np.max(logits)
+    exp_vals = np.exp(shifted)
+    return exp_vals / np.sum(exp_vals)
+
+
+def softmax_jacobian(probs):
+    """
+    Compute the Jacobian matrix of softmax.
 
     Args:
-        logits (np.ndarray): Input array
+        probs (np.ndarray): Softmax probabilities (n,)
 
     Returns:
-        float: log-sum-exp value
+        np.ndarray: Jacobian matrix (n x n)
     """
-    max_logit = np.max(logits)
-    shifted_logits = logits - max_logit
+    n = probs.shape[0]
+    jacobian = np.zeros((n, n))
 
-    return max_logit + np.log(np.sum(np.exp(shifted_logits)))
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                jacobian[i][j] = probs[i] * (1 - probs[i])
+            else:
+                jacobian[i][j] = -probs[i] * probs[j]
+
+    return jacobian
 
 
-def stable_softmax(logits):
+def cross_entropy_loss(probs, target_index):
     """
-    Stable softmax using log-sum-exp trick.
+    Compute cross-entropy loss.
 
     Args:
-        logits (np.ndarray): Input array
+        probs (np.ndarray): Softmax probabilities
+        target_index (int): Correct class index
 
     Returns:
-        np.ndarray: Softmax probabilities
+        float: Loss value
     """
-    lse = log_sum_exp(logits)
-    return np.exp(logits - lse)
+    return -np.log(probs[target_index])
 
 
-def naive_softmax(logits):
+def cross_entropy_gradient(probs, target_index):
     """
-    Unstable (naive) softmax for comparison.
+    Gradient of cross-entropy loss w.r.t logits.
+
+    Key result: grad = probs - one_hot(target)
 
     Args:
-        logits (np.ndarray): Input array
+        probs (np.ndarray): Softmax probabilities
+        target_index (int): Correct class index
 
     Returns:
-        np.ndarray: Softmax probabilities
+        np.ndarray: Gradient vector
     """
-    exp_values = np.exp(logits)
-    return exp_values / np.sum(exp_values)
+    grad = probs.copy()
+    grad[target_index] -= 1
+    return grad
 
 
 if __name__ == "__main__":
-    # Example showing instability
-    logits = np.array([1000, 1001, 1002])
+    logits = np.array([2.0, 1.0, 0.1])
+    target = 0  # correct class
 
-    print("Naive Softmax:")
-    try:
-        print(naive_softmax(logits))
-    except Exception as e:
-        print("Failed due to:", e)
+    probs = softmax(logits)
 
-    print("\nStable Softmax:")
-    print(stable_softmax(logits))
+    print("Probabilities:", probs)
 
-    print("\nLog-Sum-Exp Value:")
-    print(log_sum_exp(logits))
+    print("\nSoftmax Jacobian:")
+    print(softmax_jacobian(probs))
+
+    print("\nCross-Entropy Loss:")
+    print(cross_entropy_loss(probs, target))
+
+    print("\nGradient (Softmax + Cross-Entropy):")
+    print(cross_entropy_gradient(probs, target))
